@@ -1,0 +1,1 @@
+we need to make a local mcp server for grafity so people can use it with npx and add it to claude code
