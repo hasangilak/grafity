@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "Analyze React executor",
+  "description": "Analyzes React components and generates intelligence data",
+  "type": "object",
+  "properties": {
+    "projectRoot": {
+      "type": "string",
+      "description": "Root directory of the project to analyze"
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "Path to save the analysis results"
+    }
+  },
+  "required": ["projectRoot"]
+}

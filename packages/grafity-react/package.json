@@ -1,0 +1,31 @@
+{
+  "name": "@grafity/nx-react",
+  "version": "1.0.0",
+  "description": "Nx plugin for deep React and TypeScript analysis with AI integration",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "keywords": [
+    "nx",
+    "plugin",
+    "react",
+    "typescript",
+    "analysis",
+    "ai",
+    "mcp",
+    "claude-code"
+  ],
+  "executors": "./executors.json",
+  "generators": "./generators.json",
+  "dependencies": {
+    "@nx/devkit": "^21.5.3",
+    "@anthropic-ai/claude-code": "^1.0.0",
+    "typescript": "~5.9.2",
+    "tslib": "^2.3.0",
+    "zod": "^3.22.0",
+    "glob": "^10.3.10"
+  },
+  "peerDependencies": {
+    "nx": ">=16.0.0",
+    "@nx/workspace": ">=16.0.0"
+  }
+}

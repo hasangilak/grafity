@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "Visualize Components executor",
+  "description": "Generates interactive visualizations of React component relationships",
+  "type": "object",
+  "properties": {
+    "projectRoot": {
+      "type": "string",
+      "description": "Root directory of the project to visualize"
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "Directory where visualization files will be saved"
+    },
+    "format": {
+      "type": "string",
+      "enum": ["html", "json", "svg"],
+      "default": "html",
+      "description": "Output format for the visualization"
+    }
+  },
+  "required": ["projectRoot", "outputPath"]
+}

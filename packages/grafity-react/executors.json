@@ -1,0 +1,19 @@
+{
+  "executors": {
+    "analyze-react": {
+      "implementation": "./src/executors/analyze-react/executor",
+      "schema": "./src/executors/analyze-react/schema.json",
+      "description": "Analyze React components and generate intelligence data"
+    },
+    "visualize-components": {
+      "implementation": "./src/executors/visualize-components/executor",
+      "schema": "./src/executors/visualize-components/schema.json",
+      "description": "Generate interactive visualizations of React component relationships"
+    },
+    "detect-patterns": {
+      "implementation": "./src/executors/detect-patterns/executor",
+      "schema": "./src/executors/detect-patterns/schema.json",
+      "description": "Detect React patterns and anti-patterns in components"
+    }
+  }
+}
