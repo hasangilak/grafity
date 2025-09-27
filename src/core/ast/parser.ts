@@ -398,7 +398,11 @@ export class ASTParser {
   }
 
   private isExported(node: ts.Node): boolean {
-    return !!node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword);
+    if ('modifiers' in node) {
+      const modifiers = (node as any).modifiers;
+      return !!modifiers?.some((mod: ts.Modifier) => mod.kind === ts.SyntaxKind.ExportKeyword);
+    }
+    return false;
   }
 
   private extractFunctionCalls(node: ts.Node): FunctionCall[] {
