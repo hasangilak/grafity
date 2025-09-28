@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo, useRef, useEffect } from 'react';
 
 export interface InteractiveControlsProps {
   zoom: number;
@@ -10,13 +10,24 @@ export interface InteractiveControlsProps {
   onFitToScreen: () => void;
   onLayoutChange: (layout: string) => void;
   onToggleAnimation: () => void;
-  onExport: (format: 'svg' | 'png' | 'json') => void;
+  onExport: (format: 'svg' | 'png' | 'json' | 'link' | 'report') => void;
   onSearch: (query: string) => void;
   isAnimated?: boolean;
   currentLayout?: string;
   layouts?: string[];
   className?: string;
   style?: React.CSSProperties;
+  // Enhanced export options
+  graphData?: {
+    nodes: any[];
+    edges: any[];
+    metadata?: any;
+  };
+  currentView?: {
+    name: string;
+    filters?: any;
+    selectedNodes?: string[];
+  };
 }
 
 /**
@@ -38,7 +49,9 @@ export const InteractiveControls: React.FC<InteractiveControlsProps> = memo(({
   currentLayout = 'forceDirected',
   layouts = ['forceDirected', 'hierarchical', 'circular', 'grid', 'radial', 'tree'],
   className = '',
-  style = {}
+  style = {},
+  graphData,
+  currentView
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -61,10 +74,51 @@ export const InteractiveControls: React.FC<InteractiveControlsProps> = memo(({
     setIsLayoutMenuOpen(false);
   }, [onLayoutChange]);
 
-  const handleExportSelect = useCallback((format: 'svg' | 'png' | 'json') => {
+  const handleExportSelect = useCallback((format: 'svg' | 'png' | 'json' | 'link' | 'report') => {
     onExport(format);
     setIsExportMenuOpen(false);
   }, [onExport]);
+
+  // Helper function to generate shareable link
+  const generateShareableLink = useCallback(() => {
+    if (!graphData || !currentView) return null;
+
+    const shareData = {
+      view: currentView,
+      layout: currentLayout,
+      zoom: zoom,
+      timestamp: new Date().toISOString(),
+      nodeCount: graphData.nodes.length,
+      edgeCount: graphData.edges.length
+    };
+
+    // In a real app, this would be sent to a backend service
+    const encodedData = btoa(JSON.stringify(shareData));
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?share=${encodedData}`;
+  }, [graphData, currentView, currentLayout, zoom]);
+
+  // Helper function to generate report data
+  const generateReportData = useCallback(() => {
+    if (!graphData) return null;
+
+    const now = new Date();
+    return {
+      title: `Graph Analysis Report - ${currentView?.name || 'Untitled View'}`,
+      generatedAt: now.toISOString(),
+      summary: {
+        totalNodes: graphData.nodes.length,
+        totalEdges: graphData.edges.length,
+        selectedNodes: currentView?.selectedNodes?.length || 0,
+        currentLayout: currentLayout,
+        currentZoom: `${Math.round(zoom * 100)}%`
+      },
+      nodeBreakdown: getNodeTypeBreakdown(graphData.nodes),
+      edgeBreakdown: getEdgeTypeBreakdown(graphData.edges),
+      viewSettings: currentView,
+      metadata: graphData.metadata
+    };
+  }, [graphData, currentView, currentLayout, zoom]);
 
   const zoomPercentage = Math.round(zoom * 100);
 
@@ -365,6 +419,57 @@ export const InteractiveControls: React.FC<InteractiveControlsProps> = memo(({
             >
               Export as JSON
             </button>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: '#eee', margin: '4px 0' }} />
+
+            <button
+              className="export-option"
+              onClick={() => {
+                const link = generateShareableLink();
+                if (link) {
+                  navigator.clipboard.writeText(link).then(() => {
+                    alert('Shareable link copied to clipboard!');
+                  }).catch(() => {
+                    prompt('Copy this shareable link:', link);
+                  });
+                }
+                setIsExportMenuOpen(false);
+              }}
+              disabled={!graphData || !currentView}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '8px 12px',
+                border: 'none',
+                background: 'white',
+                textAlign: 'left',
+                cursor: graphData && currentView ? 'pointer' : 'not-allowed',
+                fontSize: '14px',
+                opacity: graphData && currentView ? 1 : 0.5
+              }}
+            >
+              🔗 Create Shareable Link
+            </button>
+
+            <button
+              className="export-option"
+              onClick={() => handleExportSelect('report')}
+              disabled={!graphData}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '8px 12px',
+                border: 'none',
+                background: 'white',
+                textAlign: 'left',
+                cursor: graphData ? 'pointer' : 'not-allowed',
+                fontSize: '14px',
+                opacity: graphData ? 1 : 0.5
+              }}
+            >
+              📊 Generate Report
+            </button>
           </div>
         )}
       </div>
@@ -375,7 +480,33 @@ export const InteractiveControls: React.FC<InteractiveControlsProps> = memo(({
 InteractiveControls.displayName = 'InteractiveControls';
 
 /**
- * Mini map for graph overview
+ * Generate heat color based on intensity (0-1)
+ */
+function getHeatColor(intensity: number): { r: number; g: number; b: number } {
+  // Clamp intensity between 0 and 1
+  intensity = Math.max(0, Math.min(1, intensity));
+
+  if (intensity < 0.5) {
+    // Green to Yellow (low to medium density)
+    const factor = intensity * 2; // 0 to 1
+    return {
+      r: Math.round(255 * factor),      // 0 to 255
+      g: 255,                           // Full green
+      b: 0                              // No blue
+    };
+  } else {
+    // Yellow to Red (medium to high density)
+    const factor = (intensity - 0.5) * 2; // 0 to 1
+    return {
+      r: 255,                           // Full red
+      g: Math.round(255 * (1 - factor)), // 255 to 0
+      b: 0                              // No blue
+    };
+  }
+}
+
+/**
+ * Mini map for graph overview with density heatmap
  */
 export const MiniMap: React.FC<{
   nodes: any[];
@@ -383,6 +514,8 @@ export const MiniMap: React.FC<{
   viewBox: { x: number; y: number; width: number; height: number };
   containerSize: { width: number; height: number };
   onViewBoxChange: (viewBox: { x: number; y: number; width: number; height: number }) => void;
+  showHeatmap?: boolean;
+  heatmapIntensity?: number;
   className?: string;
   style?: React.CSSProperties;
 }> = memo(({
@@ -391,11 +524,15 @@ export const MiniMap: React.FC<{
   viewBox,
   containerSize,
   onViewBoxChange,
+  showHeatmap = false,
+  heatmapIntensity = 1,
   className = '',
   style = {}
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [heatmapData, setHeatmapData] = useState<ImageData | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const miniMapWidth = 200;
   const miniMapHeight = 150;
@@ -405,6 +542,95 @@ export const MiniMap: React.FC<{
   const scaleX = miniMapWidth / graphBounds.width;
   const scaleY = miniMapHeight / graphBounds.height;
   const scale = Math.min(scaleX, scaleY);
+
+  // Generate heatmap data
+  const generateHeatmap = useCallback(() => {
+    if (!showHeatmap || nodes.length === 0) {
+      setHeatmapData(null);
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    canvas.width = miniMapWidth;
+    canvas.height = miniMapHeight;
+
+    // Create density grid
+    const gridSize = 10; // Size of each grid cell
+    const gridWidth = Math.ceil(miniMapWidth / gridSize);
+    const gridHeight = Math.ceil(miniMapHeight / gridSize);
+    const densityGrid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(0));
+
+    // Calculate node density for each grid cell
+    nodes.forEach(node => {
+      const x = (node.x - graphBounds.x) * scale;
+      const y = (node.y - graphBounds.y) * scale;
+
+      const gridX = Math.floor(x / gridSize);
+      const gridY = Math.floor(y / gridSize);
+
+      if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
+        densityGrid[gridY][gridX]++;
+      }
+    });
+
+    // Find max density for normalization
+    const maxDensity = Math.max(...densityGrid.flat());
+    if (maxDensity === 0) return;
+
+    // Create ImageData for heatmap
+    const imageData = ctx.createImageData(miniMapWidth, miniMapHeight);
+    const data = imageData.data;
+
+    // Generate heatmap colors
+    for (let y = 0; y < miniMapHeight; y++) {
+      for (let x = 0; x < miniMapWidth; x++) {
+        const gridX = Math.floor(x / gridSize);
+        const gridY = Math.floor(y / gridSize);
+
+        const density = densityGrid[gridY]?.[gridX] || 0;
+        const normalizedDensity = density / maxDensity;
+        const intensity = normalizedDensity * heatmapIntensity;
+
+        const pixelIndex = (y * miniMapWidth + x) * 4;
+
+        if (intensity > 0) {
+          // Create heat color based on density
+          const heatColor = getHeatColor(intensity);
+          data[pixelIndex] = heatColor.r;     // Red
+          data[pixelIndex + 1] = heatColor.g; // Green
+          data[pixelIndex + 2] = heatColor.b; // Blue
+          data[pixelIndex + 3] = Math.min(255, intensity * 200); // Alpha
+        } else {
+          data[pixelIndex + 3] = 0; // Transparent
+        }
+      }
+    }
+
+    setHeatmapData(imageData);
+  }, [nodes, showHeatmap, heatmapIntensity, scale, graphBounds]);
+
+  // Update heatmap when nodes change
+  useEffect(() => {
+    generateHeatmap();
+  }, [generateHeatmap]);
+
+  // Draw heatmap on canvas
+  useEffect(() => {
+    if (!heatmapData || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, miniMapWidth, miniMapHeight);
+    ctx.putImageData(heatmapData, 0, 0);
+  }, [heatmapData]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
@@ -450,6 +676,21 @@ export const MiniMap: React.FC<{
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Heatmap Canvas */}
+      {showHeatmap && (
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+
       <svg width={miniMapWidth} height={miniMapHeight}>
         <g transform={`scale(${scale})`}>
           {/* Render simplified edges */}
@@ -460,7 +701,7 @@ export const MiniMap: React.FC<{
               y1={edge.source.y}
               x2={edge.target.x}
               y2={edge.target.y}
-              stroke="#ddd"
+              stroke={showHeatmap ? "rgba(255,255,255,0.3)" : "#ddd"}
               strokeWidth="1"
             />
           ))}
@@ -472,7 +713,9 @@ export const MiniMap: React.FC<{
               cx={node.x}
               cy={node.y}
               r="3"
-              fill="#666"
+              fill={showHeatmap ? "rgba(255,255,255,0.8)" : "#666"}
+              stroke={showHeatmap ? "rgba(0,0,0,0.3)" : "none"}
+              strokeWidth={showHeatmap ? "0.5" : "0"}
             />
           ))}
         </g>
@@ -490,6 +733,60 @@ export const MiniMap: React.FC<{
           onMouseDown={handleMouseDown}
         />
       </svg>
+
+      {/* Heatmap Toggle */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '4px',
+          left: '4px',
+          display: 'flex',
+          gap: '4px'
+        }}
+      >
+        <button
+          onClick={() => showHeatmap && generateHeatmap()}
+          style={{
+            background: showHeatmap ? '#007bff' : 'rgba(255,255,255,0.8)',
+            color: showHeatmap ? 'white' : '#333',
+            border: '1px solid #ddd',
+            borderRadius: '3px',
+            padding: '2px 6px',
+            fontSize: '10px',
+            cursor: 'pointer'
+          }}
+          title={showHeatmap ? "Refresh heatmap" : "Heatmap disabled"}
+        >
+          🔥
+        </button>
+      </div>
+
+      {/* Density Legend */}
+      {showHeatmap && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '4px',
+            left: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '8px',
+            color: '#666'
+          }}
+        >
+          <span>Density:</span>
+          <div
+            style={{
+              width: '40px',
+              height: '8px',
+              background: 'linear-gradient(to right, rgba(0,255,0,0.3), rgba(255,255,0,0.6), rgba(255,0,0,0.8))',
+              borderRadius: '2px',
+              border: '1px solid rgba(0,0,0,0.2)'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 });
@@ -599,3 +896,25 @@ export const useKeyboardShortcuts = (actions: {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [actions]);
 };
+
+/**
+ * Helper function to get node type breakdown
+ */
+function getNodeTypeBreakdown(nodes: any[]): Record<string, number> {
+  return nodes.reduce((breakdown, node) => {
+    const type = node.type || 'unknown';
+    breakdown[type] = (breakdown[type] || 0) + 1;
+    return breakdown;
+  }, {} as Record<string, number>);
+}
+
+/**
+ * Helper function to get edge type breakdown
+ */
+function getEdgeTypeBreakdown(edges: any[]): Record<string, number> {
+  return edges.reduce((breakdown, edge) => {
+    const type = edge.type || 'unknown';
+    breakdown[type] = (breakdown[type] || 0) + 1;
+    return breakdown;
+  }, {} as Record<string, number>);
+}

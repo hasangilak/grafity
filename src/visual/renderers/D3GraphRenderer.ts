@@ -21,6 +21,11 @@ export interface D3Link extends d3.SimulationLinkDatum<D3Node> {
   data: GraphEdge;
   source: D3Node | string;
   target: D3Node | string;
+  // Edge bundling properties
+  bundled?: boolean;
+  bundleId?: string;
+  controlPoints?: Array<{ x: number; y: number }>;
+  path?: string;
 }
 
 export interface RenderOptions {
@@ -36,6 +41,9 @@ export interface RenderOptions {
   enableDrag?: boolean;
   maxZoom?: number;
   minZoom?: number;
+  enableEdgeBundling?: boolean;
+  bundlingStrength?: number;
+  bundlingIterations?: number;
 }
 
 export interface ViewLevel {
@@ -105,7 +113,10 @@ export class D3GraphRenderer {
       enableZoom: options.enableZoom !== false,
       enableDrag: options.enableDrag !== false,
       maxZoom: options.maxZoom || 10,
-      minZoom: options.minZoom || 0.1
+      minZoom: options.minZoom || 0.1,
+      enableEdgeBundling: options.enableEdgeBundling || false,
+      bundlingStrength: options.bundlingStrength || 0.85,
+      bundlingIterations: options.bundlingIterations || 60
     };
   }
 
@@ -284,11 +295,21 @@ export class D3GraphRenderer {
   private renderLinks(): void {
     if (!this.g) return;
 
+    // Apply edge bundling if enabled
+    if (this.options.enableEdgeBundling) {
+      this.applyEdgeBundling();
+      this.renderBundledEdges();
+      return;
+    }
+
     const linksLayer = this.g.select('.links-layer');
     const viewLevel = this.getCurrentViewLevel();
 
+    // Remove any bundled edges first
+    linksLayer.selectAll('.bundled-edge').remove();
+
     const links = linksLayer.selectAll<SVGLineElement, D3Link>('.link')
-      .data(this.links, d => d.id);
+      .data(this.links.filter(d => !d.bundled), d => d.id);
 
     // Remove old links
     links.exit().remove();
@@ -297,7 +318,7 @@ export class D3GraphRenderer {
     const linksEnter = links.enter()
       .append('line')
       .classed('link', true)
-      .attr('stroke', '#999')
+      .attr('stroke', d => this.getEdgeColor(d))
       .attr('stroke-opacity', 0.6)
       .attr('stroke-width', d => Math.sqrt(d.data.weight || 1))
       .attr('marker-end', d => d.data.bidirectional ? null : 'url(#arrow)');
@@ -643,6 +664,293 @@ export class D3GraphRenderer {
     this.links = [];
     this.visibleNodes.clear();
     this.quadtree = null;
+  }
+
+  /**
+   * Apply edge bundling algorithm
+   */
+  private applyEdgeBundling(): void {
+    if (!this.options.enableEdgeBundling || this.links.length === 0) return;
+
+    // Reset bundling properties
+    this.links.forEach(link => {
+      link.bundled = false;
+      link.bundleId = undefined;
+      link.controlPoints = [];
+      link.path = undefined;
+    });
+
+    // Group edges by similar paths
+    const bundleGroups = this.groupSimilarEdges();
+
+    // Apply bundling to each group
+    bundleGroups.forEach((group, groupId) => {
+      if (group.length > 1) {
+        this.bundleEdgeGroup(group, groupId);
+      }
+    });
+  }
+
+  /**
+   * Group similar edges for bundling
+   */
+  private groupSimilarEdges(): Map<string, D3Link[]> {
+    const groups = new Map<string, D3Link[]>();
+    const threshold = 50; // Distance threshold for grouping
+
+    this.links.forEach(link => {
+      const source = link.source as D3Node;
+      const target = link.target as D3Node;
+
+      if (!source.x || !source.y || !target.x || !target.y) return;
+
+      // Create a key based on approximate direction and distance
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+
+      // Quantize angle and distance for grouping
+      const angleGroup = Math.round(angle / (Math.PI / 8)) * (Math.PI / 8);
+      const distanceGroup = Math.round(distance / threshold) * threshold;
+      const groupKey = `${angleGroup.toFixed(2)}_${distanceGroup}`;
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, []);
+      }
+      groups.get(groupKey)!.push(link);
+    });
+
+    return groups;
+  }
+
+  /**
+   * Bundle a group of edges together
+   */
+  private bundleEdgeGroup(edges: D3Link[], groupId: string): void {
+    const bundleId = `bundle_${groupId}`;
+
+    // Calculate bundle path using force-directed bundling
+    const controlPoints = this.calculateBundlePath(edges);
+
+    edges.forEach(edge => {
+      edge.bundled = true;
+      edge.bundleId = bundleId;
+      edge.controlPoints = controlPoints;
+      edge.path = this.generateBundlePath(edge, controlPoints);
+    });
+  }
+
+  /**
+   * Calculate bundle path control points
+   */
+  private calculateBundlePath(edges: D3Link[]): Array<{ x: number; y: number }> {
+    if (edges.length === 0) return [];
+
+    const firstEdge = edges[0];
+    const source = firstEdge.source as D3Node;
+    const target = firstEdge.target as D3Node;
+
+    if (!source.x || !source.y || !target.x || !target.y) return [];
+
+    // Simple bundling: create control points along the edge
+    const controlPoints: Array<{ x: number; y: number }> = [];
+    const segments = Math.max(3, Math.min(8, Math.floor(edges.length / 2)));
+
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      const x = source.x + (target.x - source.x) * t;
+      const y = source.y + (target.y - source.y) * t;
+
+      // Add some curvature to the bundle
+      const offset = Math.sin(t * Math.PI) * 20 * (edges.length / 10);
+      const perpX = -(target.y - source.y) / Math.sqrt((target.x - source.x) ** 2 + (target.y - source.y) ** 2);
+      const perpY = (target.x - source.x) / Math.sqrt((target.x - source.x) ** 2 + (target.y - source.y) ** 2);
+
+      controlPoints.push({
+        x: x + perpX * offset,
+        y: y + perpY * offset
+      });
+    }
+
+    // Iteratively refine control points using force-directed approach
+    for (let iter = 0; iter < this.options.bundlingIterations; iter++) {
+      this.refineBundleControlPoints(controlPoints, edges);
+    }
+
+    return controlPoints;
+  }
+
+  /**
+   * Refine bundle control points using force-directed approach
+   */
+  private refineBundleControlPoints(
+    controlPoints: Array<{ x: number; y: number }>,
+    edges: D3Link[]
+  ): void {
+    const strength = this.options.bundlingStrength;
+
+    controlPoints.forEach((point, i) => {
+      let fx = 0, fy = 0;
+
+      // Attraction to nearby edges
+      edges.forEach(edge => {
+        const source = edge.source as D3Node;
+        const target = edge.target as D3Node;
+
+        if (!source.x || !source.y || !target.x || !target.y) return;
+
+        const t = (i + 1) / (controlPoints.length + 1);
+        const edgePoint = {
+          x: source.x + (target.x - source.x) * t,
+          y: source.y + (target.y - source.y) * t
+        };
+
+        const dx = edgePoint.x - point.x;
+        const dy = edgePoint.y - point.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0) {
+          fx += (dx / distance) * strength;
+          fy += (dy / distance) * strength;
+        }
+      });
+
+      // Smoothing with neighboring control points
+      if (i > 0) {
+        const prev = controlPoints[i - 1];
+        fx += (prev.x - point.x) * 0.1;
+        fy += (prev.y - point.y) * 0.1;
+      }
+
+      if (i < controlPoints.length - 1) {
+        const next = controlPoints[i + 1];
+        fx += (next.x - point.x) * 0.1;
+        fy += (next.y - point.y) * 0.1;
+      }
+
+      point.x += fx * 0.1;
+      point.y += fy * 0.1;
+    });
+  }
+
+  /**
+   * Generate SVG path string for bundled edge
+   */
+  private generateBundlePath(edge: D3Link, controlPoints: Array<{ x: number; y: number }>): string {
+    const source = edge.source as D3Node;
+    const target = edge.target as D3Node;
+
+    if (!source.x || !source.y || !target.x || !target.y) return '';
+
+    let path = `M ${source.x} ${source.y}`;
+
+    if (controlPoints.length === 0) {
+      path += ` L ${target.x} ${target.y}`;
+    } else {
+      // Create smooth curve through control points
+      if (controlPoints.length === 1) {
+        path += ` Q ${controlPoints[0].x} ${controlPoints[0].y} ${target.x} ${target.y}`;
+      } else {
+        // Use cubic Bezier curves for multiple control points
+        for (let i = 0; i < controlPoints.length; i++) {
+          const cp = controlPoints[i];
+          const nextPoint = i === controlPoints.length - 1 ? { x: target.x, y: target.y } : controlPoints[i + 1];
+
+          if (i === 0) {
+            // First control point
+            path += ` Q ${cp.x} ${cp.y} ${(cp.x + nextPoint.x) / 2} ${(cp.y + nextPoint.y) / 2}`;
+          } else if (i === controlPoints.length - 1) {
+            // Last control point to target
+            path += ` Q ${cp.x} ${cp.y} ${target.x} ${target.y}`;
+          } else {
+            // Intermediate control points
+            path += ` Q ${cp.x} ${cp.y} ${(cp.x + nextPoint.x) / 2} ${(cp.y + nextPoint.y) / 2}`;
+          }
+        }
+      }
+    }
+
+    return path;
+  }
+
+  /**
+   * Update edge rendering to use bundled paths
+   */
+  private renderBundledEdges(): void {
+    if (!this.g) return;
+
+    const linksLayer = this.g.select('.links-layer');
+
+    // Remove existing bundled paths
+    linksLayer.selectAll('.bundled-edge').remove();
+
+    // Group bundled edges by bundle ID
+    const bundleGroups = new Map<string, D3Link[]>();
+    this.links.forEach(link => {
+      if (link.bundled && link.bundleId) {
+        if (!bundleGroups.has(link.bundleId)) {
+          bundleGroups.set(link.bundleId, []);
+        }
+        bundleGroups.get(link.bundleId)!.push(link);
+      }
+    });
+
+    // Render each bundle
+    bundleGroups.forEach((bundle, bundleId) => {
+      const bundleGroup = linksLayer.append('g')
+        .classed('bundled-edge', true)
+        .attr('data-bundle-id', bundleId);
+
+      bundle.forEach((link, index) => {
+        if (link.path) {
+          bundleGroup.append('path')
+            .attr('d', link.path)
+            .attr('stroke', this.getEdgeColor(link))
+            .attr('stroke-width', 1)
+            .attr('fill', 'none')
+            .attr('opacity', 0.7)
+            .attr('stroke-dasharray', index > 0 ? '2,2' : 'none') // Dash non-primary edges in bundle
+            .classed('bundled-path', true);
+        }
+      });
+    });
+  }
+
+  /**
+   * Get edge color based on type
+   */
+  private getEdgeColor(edge: D3Link): string {
+    const colors: Record<string, string> = {
+      'dependency': '#4A90E2',
+      'communication': '#BD10E0',
+      'dataFlow': '#50E3C2',
+      'reference': '#F5A623'
+    };
+    return colors[edge.data.type] || '#999';
+  }
+
+  /**
+   * Enable or disable edge bundling
+   */
+  setEdgeBundling(enabled: boolean): void {
+    this.options.enableEdgeBundling = enabled;
+    if (enabled) {
+      this.applyEdgeBundling();
+      this.renderBundledEdges();
+    } else {
+      // Remove bundling and render normal edges
+      this.links.forEach(link => {
+        link.bundled = false;
+        link.bundleId = undefined;
+        link.controlPoints = [];
+        link.path = undefined;
+      });
+      if (this.g) {
+        this.g.select('.links-layer').selectAll('.bundled-edge').remove();
+      }
+      this.render(); // Re-render with normal edges
+    }
   }
 
   /**
