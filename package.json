@@ -12,7 +12,14 @@
     "demo:patterns": "nx detect-patterns sample-react-app --outputPath=dist/demo-patterns.md",
     "graph:build": "npx ts-node tests/test-phase3-visualization.ts",
     "graph:visualize": "npx ts-node tests/test-phase3-visualization.ts",
-    "graph:demo": "npm run graph:visualize"
+    "graph:demo": "npm run graph:visualize",
+    "neo4j:start": "./scripts/neo4j.sh start",
+    "neo4j:stop": "./scripts/neo4j.sh stop",
+    "neo4j:status": "./scripts/neo4j.sh status",
+    "neo4j:shell": "./scripts/neo4j.sh shell",
+    "neo4j:import": "./scripts/neo4j.sh import",
+    "neo4j:clear": "./scripts/neo4j.sh clear",
+    "neo4j:test": "npx ts-node src/core/graph-engine/test-neo4j.ts"
   },
   "keywords": [
     "code-visualization",
@@ -31,9 +38,11 @@
     "@typescript-eslint/typescript-estree": "^6.15.0",
     "chokidar": "^3.5.3",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
     "express": "^4.18.2",
     "fast-glob": "^3.3.2",
     "glob": "^10.3.10",
+    "neo4j-driver": "^5.28.2",
     "typescript": "~5.9.2",
     "ws": "^8.14.2"
   },
