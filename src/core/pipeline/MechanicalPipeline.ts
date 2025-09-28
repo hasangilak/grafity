@@ -183,11 +183,10 @@ export class MechanicalPipeline extends EventEmitter {
   private async buildProgram(nxData: NxGraphData): Promise<ProgramInfo> {
     // Collect all TypeScript files from projects
     const allFiles: string[] = [];
-    for (const [_, project] of nxData.projects) {
-      if (project.files) {
-        allFiles.push(...project.files);
-      }
-    }
+
+    // NxGraphData.projects is a Map<string, ProjectConfiguration>
+    // We'll just use the program builder to create from config
+    // since Nx projects don't directly contain file lists in the same way
 
     // Create program from config or files
     const programInfo = this.programBuilder.createProgramFromConfig();

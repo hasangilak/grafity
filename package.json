@@ -9,7 +9,10 @@
     "lint": "nx lint @grafity/nx-react",
     "demo:analyze": "nx analyze-react sample-react-app",
     "demo:visualize": "nx visualize-components sample-react-app --outputPath=dist/demo-viz",
-    "demo:patterns": "nx detect-patterns sample-react-app --outputPath=dist/demo-patterns.md"
+    "demo:patterns": "nx detect-patterns sample-react-app --outputPath=dist/demo-patterns.md",
+    "graph:build": "npx ts-node tests/test-phase3-visualization.ts",
+    "graph:visualize": "npx ts-node tests/test-phase3-visualization.ts",
+    "graph:demo": "npm run graph:visualize"
   },
   "keywords": [
     "code-visualization",
