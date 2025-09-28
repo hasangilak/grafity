@@ -50,19 +50,24 @@ export interface BusinessNode extends GraphNode {
 
 export interface DocumentNode extends GraphNode {
   type: 'document';
-  documentType: 'markdown' | 'comment' | 'readme' | 'spec' | 'api-doc';
+  documentType?: 'markdown' | 'comment' | 'readme' | 'spec' | 'api-doc';
   filePath?: string;
   section?: string;
+  sections?: any[];
   content?: string;
   author?: string;
 }
 
 export interface ConversationNode extends GraphNode {
   type: 'conversation';
-  conversationType: 'message' | 'question' | 'answer' | 'decision' | 'insight';
+  conversationType?: 'message' | 'question' | 'answer' | 'decision' | 'insight';
   participant?: string;
-  timestamp: Date;
-  content: string;
+  participants?: string[];
+  timestamp?: Date;
+  startTime?: string;
+  endTime?: string;
+  content?: string;
+  messages?: any[];
   context?: string;
 }
 

@@ -28,21 +28,25 @@ export type EdgeRelationType =
   | 'references'
   | 'describes'
   | 'specifies'
+  | 'links'
 
   // Conversation relationships
   | 'responds_to'
+  | 'responds'
   | 'mentions'
   | 'discusses'
   | 'decides'
+  | 'follows'
 
   // Cross-domain relationships
   | 'relates_to'
+  | 'related'
   | 'connects_with'
   | 'bidirectional';
 
 export interface EdgeMetadata {
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
   confidence?: number;
   source?: string;
   automatic?: boolean;
