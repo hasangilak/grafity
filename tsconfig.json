@@ -20,7 +20,7 @@
     "resolveJsonModule": true,
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "paths": {
-      "grafity-react": ["packages/grafity-react/src/index.ts"]
+      "grafity-react": ["./packages/grafity-react/src/index.ts"]
     }
   },
   "include": ["src/**/*"],
