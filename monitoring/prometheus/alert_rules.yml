@@ -1,0 +1,145 @@
+# Prometheus Alert Rules for Grafity
+groups:
+  - name: grafity.rules
+    rules:
+      # Application Health Alerts
+      - alert: GrafityAppDown
+        expr: up{job="grafity-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Grafity application is down"
+          description: "Grafity application has been down for more than 1 minute"
+
+      - alert: GrafityHighErrorRate
+        expr: rate(http_requests_total{job="grafity-app",status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 10% for the last 5 minutes"
+
+      - alert: GrafityHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="grafity-app"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is above 2 seconds"
+
+      - alert: GrafityHighMemoryUsage
+        expr: (process_resident_memory_bytes{job="grafity-app"} / 1024 / 1024) > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Application memory usage is above 1GB"
+
+      # Database Alerts
+      - alert: Neo4jDown
+        expr: up{job="neo4j"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Neo4j database is down"
+          description: "Neo4j database has been down for more than 1 minute"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      - alert: Neo4jHighMemoryUsage
+        expr: neo4j_heap_used_bytes / neo4j_heap_max_bytes > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Neo4j high memory usage"
+          description: "Neo4j heap memory usage is above 80%"
+
+      # Analysis Performance Alerts
+      - alert: HighAnalysisQueueLength
+        expr: grafity_analysis_queue_length > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Analysis queue is growing"
+          description: "Analysis queue has more than 50 pending jobs"
+
+      - alert: SlowAnalysisProcessing
+        expr: histogram_quantile(0.95, rate(grafity_analysis_duration_seconds_bucket[10m])) > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow analysis processing"
+          description: "95th percentile analysis time is above 5 minutes"
+
+      - alert: HighAnalysisFailureRate
+        expr: rate(grafity_analysis_failures_total[5m]) / rate(grafity_analysis_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High analysis failure rate"
+          description: "Analysis failure rate is above 5%"
+
+  - name: infrastructure.rules
+    rules:
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for 5 minutes"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 85%"
+
+      - alert: LowDiskSpace
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is above 90% full"
+
+      # Kubernetes Alerts (if applicable)
+      - alert: PodRestartingTooOften
+        expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod restarting too often"
+          description: "Pod {{ $labels.pod }} is restarting frequently"
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="false"} == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod not ready"
+          description: "Pod {{ $labels.pod }} has been not ready for more than 10 minutes"

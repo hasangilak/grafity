@@ -1,0 +1,383 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/**'
+      - '*.md'
+
+env:
+  NODE_VERSION: '18.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Check if release is needed
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if release needed
+        id: check
+        run: |
+          # Check if there are any commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          COMMITS_SINCE_TAG=$(git rev-list ${LAST_TAG}..HEAD --count)
+
+          if [ "$COMMITS_SINCE_TAG" -gt 0 ]; then
+            echo "should-release=true" >> $GITHUB_OUTPUT
+
+            # Determine version bump based on commit messages
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s")
+
+            if echo "$COMMITS" | grep -q "BREAKING CHANGE\|!:"; then
+              BUMP="major"
+            elif echo "$COMMITS" | grep -q "^feat"; then
+              BUMP="minor"
+            else
+              BUMP="patch"
+            fi
+
+            # Calculate next version
+            CURRENT_VERSION=${LAST_TAG#v}
+            if [ "$CURRENT_VERSION" = "v0.0.0" ]; then
+              CURRENT_VERSION="0.0.0"
+            fi
+
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+            MAJOR=${VERSION_PARTS[0]}
+            MINOR=${VERSION_PARTS[1]}
+            PATCH=${VERSION_PARTS[2]}
+
+            case $BUMP in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "Next version: $NEW_VERSION (bump: $BUMP)"
+          else
+            echo "should-release=false" >> $GITHUB_OUTPUT
+            echo "No commits since last tag, skipping release"
+          fi
+
+  # Run all tests before release
+  test:
+    runs-on: ubuntu-latest
+    needs: check-release
+    if: needs.check-release.outputs.should-release == 'true'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/test-password
+          NEO4J_PLUGINS: '["apoc"]'
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p test-password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 7474:7474
+          - 7687:7687
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for services
+        run: |
+          sleep 30
+          curl -f http://localhost:7474 || exit 1
+          redis-cli -h localhost ping || exit 1
+
+      - name: Run full test suite
+        run: |
+          npm run test:unit
+          npm run test:integration
+          npm run test:coverage
+        env:
+          NODE_ENV: test
+          REDIS_URL: redis://localhost:6379
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: test-password
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+
+  # Create release
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [check-release, test]
+    if: needs.check-release.outputs.should-release == 'true'
+    outputs:
+      tag: ${{ steps.create-tag.outputs.tag }}
+      upload-url: ${{ steps.create-release.outputs.upload_url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update package.json version
+        run: |
+          npm version ${{ needs.check-release.outputs.version }} --no-git-tag-version
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to v${{ needs.check-release.outputs.version }}"
+
+      - name: Create and push tag
+        id: create-tag
+        run: |
+          TAG="v${{ needs.check-release.outputs.version }}"
+          git tag $TAG
+          git push origin HEAD:main
+          git push origin $TAG
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog from commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$LAST_TAG" ]; then
+            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build distribution
+        run: |
+          npm run build
+          npm run package
+          tar -czf grafity-${{ needs.check-release.outputs.version }}.tar.gz dist/
+
+      - name: Create GitHub Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.create-tag.outputs.tag }}
+          release_name: Release ${{ steps.create-tag.outputs.tag }}
+          body: |
+            ## What's Changed
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Installation
+
+            ```bash
+            npm install -g @grafity/cli@${{ needs.check-release.outputs.version }}
+            ```
+
+            ## Docker
+
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.create-tag.outputs.tag }}
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./grafity-${{ needs.check-release.outputs.version }}.tar.gz
+          asset_name: grafity-${{ needs.check-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+
+  # Build and push Docker image
+  build-release-image:
+    runs-on: ubuntu-latest
+    needs: [check-release, create-release]
+    if: needs.check-release.outputs.should-release == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.check-release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.check-release.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.check-release.outputs.version }}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Publish to npm
+  publish-npm:
+    runs-on: ubuntu-latest
+    needs: [check-release, create-release]
+    if: needs.check-release.outputs.should-release == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Deploy to production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [check-release, build-release-image]
+    if: needs.check-release.outputs.should-release == 'true'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.tag }}
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+      - name: Deploy to production
+        run: |
+          sed -i 's|{{IMAGE}}|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.check-release.outputs.version }}|g' k8s/production/deployment.yaml
+          kubectl apply -f k8s/production/
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/grafity-app -n production
+          kubectl get pods -n production
+
+      - name: Run smoke tests
+        run: |
+          PRODUCTION_URL=$(kubectl get service grafity-app -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          curl -f http://$PRODUCTION_URL/health || exit 1
+
+  # Notify release
+  notify-release:
+    runs-on: ubuntu-latest
+    needs: [check-release, create-release, publish-npm, deploy-production]
+    if: always() && needs.check-release.outputs.should-release == 'true'
+
+    steps:
+      - name: Notify release status
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#releases'
+          text: |
+            🚀 *Release ${{ needs.create-release.outputs.tag }}*
+
+            Status: ${{ job.status }}
+
+            📦 npm: https://www.npmjs.com/package/@grafity/cli/v/${{ needs.check-release.outputs.version }}
+            🐳 Docker: ghcr.io/${{ github.repository }}:${{ needs.check-release.outputs.version }}
+            📋 Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.tag }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafity-app
+  namespace: grafity
+  labels:
+    app: grafity
+    component: app
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: grafity
+      component: app
+  template:
+    metadata:
+      labels:
+        app: grafity
+        component: app
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: grafity
+        image: {{IMAGE}} # This will be replaced by CI/CD pipeline
+        ports:
+        - containerPort: 4000
+          name: http
+        env:
+        - name: NEO4J_URI
+          value: "bolt://neo4j:7687"
+        - name: NEO4J_USER
+          value: "neo4j"
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafity-secrets
+              key: NEO4J_PASSWORD
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: grafity-secrets
+              key: JWT_SECRET
+        envFrom:
+        - configMapRef:
+            name: grafity-config
+        volumeMounts:
+        - name: grafity-logs
+          mountPath: /app/logs
+        - name: grafity-uploads
+          mountPath: /app/tmp/uploads
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: grafity-logs
+        persistentVolumeClaim:
+          claimName: grafity-logs-pvc
+      - name: grafity-uploads
+        persistentVolumeClaim:
+          claimName: grafity-uploads-pvc
+      restartPolicy: Always
+      initContainers:
+      - name: wait-for-neo4j
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z neo4j 7687; do
+            echo "Waiting for Neo4j to be ready..."
+            sleep 2
+          done
+          echo "Neo4j is ready"
+      - name: wait-for-redis
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z redis 6379; do
+            echo "Waiting for Redis to be ready..."
+            sleep 2
+          done
+          echo "Redis is ready"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafity-app
+  namespace: grafity
+  labels:
+    app: grafity
+    component: app
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 4000
+    protocol: TCP
+    name: http
+  selector:
+    app: grafity
+    component: app
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafity-ingress
+  namespace: grafity
+  labels:
+    app: grafity
+    component: ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+  - hosts:
+    - grafity.yourdomain.com # Replace with your domain
+    secretName: grafity-tls
+  rules:
+  - host: grafity.yourdomain.com # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafity-app
+            port:
+              number: 80

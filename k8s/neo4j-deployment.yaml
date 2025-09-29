@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neo4j
+  namespace: grafity
+  labels:
+    app: grafity
+    component: neo4j
+spec:
+  replicas: 1 # Neo4j Community Edition doesn't support clustering
+  strategy:
+    type: Recreate # Required for stateful services with persistent storage
+  selector:
+    matchLabels:
+      app: grafity
+      component: neo4j
+  template:
+    metadata:
+      labels:
+        app: grafity
+        component: neo4j
+    spec:
+      containers:
+      - name: neo4j
+        image: neo4j:5-community
+        ports:
+        - containerPort: 7474
+          name: http
+        - containerPort: 7687
+          name: bolt
+        env:
+        - name: NEO4J_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: neo4j-auth
+              key: NEO4J_AUTH
+        envFrom:
+        - configMapRef:
+            name: grafity-neo4j-config
+        volumeMounts:
+        - name: neo4j-data
+          mountPath: /data
+        - name: neo4j-logs
+          mountPath: /logs
+        - name: neo4j-import
+          mountPath: /var/lib/neo4j/import
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - "cypher-shell -u neo4j -p $NEO4J_PASSWORD 'RETURN 1'"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - "cypher-shell -u neo4j -p $NEO4J_PASSWORD 'RETURN 1'"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 7474
+          runAsGroup: 7474
+          fsGroup: 7474
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: neo4j-data
+        persistentVolumeClaim:
+          claimName: neo4j-data-pvc
+      - name: neo4j-logs
+        persistentVolumeClaim:
+          claimName: neo4j-logs-pvc
+      - name: neo4j-import
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j
+  namespace: grafity
+  labels:
+    app: grafity
+    component: neo4j
+spec:
+  type: ClusterIP
+  ports:
+  - port: 7474
+    targetPort: 7474
+    protocol: TCP
+    name: http
+  - port: 7687
+    targetPort: 7687
+    protocol: TCP
+    name: bolt
+  selector:
+    app: grafity
+    component: neo4j

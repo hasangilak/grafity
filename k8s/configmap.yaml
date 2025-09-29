@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafity-config
+  namespace: grafity
+  labels:
+    app: grafity
+    component: config
+data:
+  NODE_ENV: "production"
+  PORT: "4000"
+  LOG_LEVEL: "info"
+  RATE_LIMIT_ENABLED: "true"
+  METRICS_ENABLED: "true"
+  PROMETHEUS_ENABLED: "true"
+  CACHE_ENABLED: "true"
+  CACHE_TTL: "3600"
+  MAX_CONCURRENT_JOBS: "5"
+  JOB_TIMEOUT: "300000"
+  MAX_FILE_SIZE: "10485760"
+  UPLOAD_MAX_FILE_SIZE: "52428800"
+  MAX_GRAPH_NODES: "1000"
+  MAX_GRAPH_EDGES: "5000"
+  DEFAULT_LAYOUT: "force"
+  ENABLE_CLUSTERING: "true"
+  HEALTH_CHECK_TIMEOUT: "5000"
+  MEMORY_THRESHOLD: "0.9"
+  DISK_THRESHOLD: "0.9"
+  TRUST_PROXY: "true"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafity-neo4j-config
+  namespace: grafity
+  labels:
+    app: grafity
+    component: neo4j
+data:
+  NEO4J_apoc_export_file_enabled: "true"
+  NEO4J_apoc_import_file_enabled: "true"
+  NEO4J_apoc_import_file_use__neo4j__config: "true"
+  NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+  NEO4J_server_memory_heap_initial__size: "512m"
+  NEO4J_server_memory_heap_max__size: "2G"
+  NEO4J_dbms_memory_pagecache_size: "1G"
+  NEO4J_dbms_memory_transaction_total_max: "2G"
+  NEO4J_PLUGINS: '["apoc"]'

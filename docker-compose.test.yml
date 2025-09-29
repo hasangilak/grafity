@@ -1,0 +1,62 @@
+version: '3.8'
+
+# Testing overrides for docker-compose.yml
+services:
+  # Override grafity service for testing
+  grafity:
+    build:
+      target: tester
+    environment:
+      - NODE_ENV=test
+      - LOG_LEVEL=warn
+      - RATE_LIMIT_ENABLED=false
+      - NEO4J_PASSWORD=test-password
+      - JWT_SECRET=test-jwt-secret
+    command: ["npm", "run", "test:ci"]
+
+  # Test database with different credentials
+  neo4j:
+    environment:
+      NEO4J_AUTH: neo4j/test-password
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_dbms_memory_pagecache_size: 256m
+
+  # Test Redis with minimal memory
+  redis:
+    command: redis-server --appendonly no --maxmemory 32mb --maxmemory-policy allkeys-lru
+
+  # Add test utilities
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tester
+    container_name: grafity-test-runner
+    environment:
+      - NODE_ENV=test
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=test-password
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - test-results:/app/test-results
+      - coverage-reports:/app/coverage
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - grafity-network
+    command: ["npm", "run", "test:all"]
+    profiles:
+      - test
+
+volumes:
+  test-results:
+    driver: local
+  coverage-reports:
+    driver: local

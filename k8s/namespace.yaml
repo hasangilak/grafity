@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grafity
+  labels:
+    name: grafity
+    app: grafity
+    environment: production

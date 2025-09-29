@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: grafity-staging
+
+resources:
+  - ../namespace.yaml
+  - ../configmap.yaml
+  - ../secrets.yaml
+  - ../persistent-volumes.yaml
+  - ../neo4j-deployment.yaml
+  - ../redis-deployment.yaml
+  - ../grafity-deployment.yaml
+
+patchesStrategicMerge:
+  - staging-patches.yaml
+
+namePrefix: staging-
+
+commonLabels:
+  environment: staging
+
+images:
+  - name: grafity
+    newTag: staging-latest
+
+configMapGenerator:
+  - name: grafity-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+      - LOG_LEVEL=debug
+      - RATE_LIMIT_ENABLED=false
+
+replicas:
+  - name: grafity-app
+    count: 2
