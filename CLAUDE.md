@@ -48,6 +48,7 @@ npm run lint         # Lint the plugin code
 npm run demo:analyze    # Analyze sample React app
 npm run demo:visualize  # Generate component visualization
 npm run demo:patterns   # Detect React patterns
+npm run demo:graph-chat # Graph-based conversation with branching
 ```
 
 ### Nx Executors (for React projects)

@@ -32,6 +32,16 @@ export class ConversationGraphBuilder extends GraphBuilder {
   private conversationCache = new Map<string, ConversationNode>();
 
   /**
+   * Implement abstract build method from GraphBuilder
+   */
+  async build(data: any): Promise<any> {
+    if (data.messages) {
+      return await this.processConversation(data);
+    }
+    return this.store;
+  }
+
+  /**
    * Process conversation data
    */
   async processConversation(data: ConversationData): Promise<ParsedConversation> {
@@ -49,12 +59,13 @@ export class ConversationGraphBuilder extends GraphBuilder {
 
       // Connect message to conversation
       this.store.addEdge({
-        id: `${conversation.id}-contains-${messageNode.id}`,
+        id: `${conversation.id}-relates_to-${messageNode.id}`,
         source: conversation.id,
         target: messageNode.id,
-        type: 'contains',
+        type: 'relates_to',
         bidirectional: false,
-        weight: 1
+        weight: 1,
+        metadata: { relationship: 'contains' }
       });
     }
 
@@ -83,7 +94,7 @@ export class ConversationGraphBuilder extends GraphBuilder {
    * Parse conversation to extract references and topics
    */
   private parseConversation(data: ConversationData): ParsedConversation {
-    const nodeId = this.generateNodeId('conversation', data.id);
+    const nodeId = this.generateNodeId(`conversation-${data.id}`);
 
     const conversation: ConversationNode = {
       id: nodeId,
@@ -125,7 +136,7 @@ export class ConversationGraphBuilder extends GraphBuilder {
     conversation: ConversationNode,
     message: ConversationMessage
   ): ConversationNode {
-    const nodeId = this.generateNodeId('message', message.id);
+    const nodeId = this.generateNodeId(`message-${message.id}`);
 
     return {
       id: nodeId,
@@ -308,8 +319,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
     messages: ConversationMessage[]
   ): void {
     for (let i = 0; i < messages.length - 1; i++) {
-      const currentId = this.generateNodeId('message', messages[i].id);
-      const nextId = this.generateNodeId('message', messages[i + 1].id);
+      const currentId = this.generateNodeId(`message-${messages[i].id}`);
+      const nextId = this.generateNodeId(`message-${messages[i + 1].id}`);
 
       // Create flow edge between consecutive messages
       this.store.addEdge({
@@ -336,7 +347,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
           target: currentId,
           type: 'responds',
           bidirectional: false,
-          weight: 0.9
+          weight: 0.9,
+          metadata: {}
         });
       }
     }
@@ -371,7 +383,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
           target: node.id,
           type: 'references',
           bidirectional: false,
-          weight: 0.7
+          weight: 0.7,
+          metadata: {}
         });
       }
     }
@@ -396,7 +409,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
           target: node.id,
           type: 'references',
           bidirectional: false,
-          weight: 0.7
+          weight: 0.7,
+          metadata: {}
         });
       }
     }
@@ -406,7 +420,7 @@ export class ConversationGraphBuilder extends GraphBuilder {
    * Create topic node
    */
   private createTopicNode(conversation: ConversationNode, topic: string): void {
-    const topicId = this.generateNodeId('topic', topic);
+    const topicId = this.generateNodeId(`topic-${topic}`);
 
     // Check if topic node exists
     let topicNode = this.store.getNode(topicId);
@@ -445,7 +459,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
       target: topicId,
       type: 'discusses',
       bidirectional: false,
-      weight: 0.6
+      weight: 0.6,
+      metadata: {}
     });
   }
 
@@ -482,7 +497,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
             target: conversations[j].id,
             type: 'related',
             bidirectional: true,
-            weight: similarity
+            weight: similarity,
+            metadata: {}
           });
         }
       }
@@ -496,8 +512,8 @@ export class ConversationGraphBuilder extends GraphBuilder {
     conv1: ConversationNode,
     conv2: ConversationNode
   ): number {
-    const content1 = conv1.messages.map(m => m.content).join(' ').toLowerCase();
-    const content2 = conv2.messages.map(m => m.content).join(' ').toLowerCase();
+    const content1 = (conv1.messages || []).map(m => m.content).join(' ').toLowerCase();
+    const content2 = (conv2.messages || []).map(m => m.content).join(' ').toLowerCase();
 
     // Extract key terms
     const terms1 = this.extractKeyTerms(content1);

@@ -4,12 +4,13 @@
 
 ## 🚀 Current Development Status
 
-### ✅ Phase 3: Graph Engine Core (90% Complete)
+### ✅ Phase 3: Graph Engine Core (95% Complete)
 - **Multi-Node Support**: CodeNode, BusinessNode, DocumentNode, ConversationNode
 - **Graph Operations**: Advanced CRUD, indexing, traversal algorithms (BFS, DFS, shortest path)
 - **Neo4j Integration**: Enterprise-grade persistence with Docker setup and Cypher queries
 - **Query Engine**: Complex graph queries with filtering and aggregations
 - **Performance**: Tested with 4,170+ nodes, <50ms query times
+- **Conversation Graph**: Bidirectional connections, branching support, code/doc linking
 
 ### ✅ Phase 4: Visual Interface (80% Complete)
 - **D3.js Renderer**: Semantic zoom (3 levels), quadtree spatial indexing, 1000+ node support
@@ -118,6 +119,7 @@ grafity_react_prop_flow({ projectName: "my-app" })
 - **High Performance** - 4,170+ nodes tested, <50ms query times
 - **Advanced Algorithms** - BFS, DFS, shortest path, cycle detection
 - **Scalable Architecture** - Memory + database hybrid storage
+- **Conversation Graphs** - Chat as visual graph with branching and bidirectional connections
 
 ### Visual Interface
 - **Performance at Scale** - 1000+ nodes with quadtree spatial indexing
@@ -196,6 +198,9 @@ npm run test:neo4j
 
 # Generate test graph with 100 nodes
 npm run demo:large-graph
+
+# Test graph-based conversation with branching
+npm run demo:graph-chat
 ```
 
 ### React Analysis Demo
