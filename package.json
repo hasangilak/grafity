@@ -24,6 +24,7 @@
     "demo:visualize": "ts-node scripts/demo/visualize.ts",
     "demo:patterns": "ts-node scripts/demo/patterns.ts",
     "demo:graph-chat": "ts-node scripts/demo/graph-chat.ts",
+    "demo:graph-chat-ui": "vite scripts/demo/graph-chat-ui.html --open",
     "docs:generate": "typedoc src --out docs/api",
     "docker:build": "docker build -t grafity:latest .",
     "docker:run": "docker run -p 3000:3000 grafity:latest",

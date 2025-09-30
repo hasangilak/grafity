@@ -448,12 +448,46 @@ export class HtmlGraphGenerator {
             tooltipContent += 'Type: ' + d.type;
             if (d.codeType) tooltipContent += ' (' + d.codeType + ')';
             tooltipContent += '<br/>';
-            if (d.description) tooltipContent += d.description + '<br/>';
-            if (d.filePath) tooltipContent += 'File: ' + d.filePath;
+
+            // Enhanced tooltip for conversation nodes (messages)
+            if (d.type === 'conversation' && d.metadata) {
+                // Show message content preview
+                const content = d.metadata.content || d.description || '';
+                if (content) {
+                    const preview = content.substring(0, 100);
+                    tooltipContent += '<div style="margin-top: 8px; padding: 6px; background: #f3f4f6; border-radius: 4px; font-size: 11px;">';
+                    tooltipContent += preview + (content.length > 100 ? '...' : '');
+                    tooltipContent += '</div>';
+                }
+
+                // Show metadata
+                if (d.metadata.timestamp) {
+                    tooltipContent += '<div style="margin-top: 4px; font-size: 11px; color: #6b7280;">⏱️ ' + new Date(d.metadata.timestamp).toLocaleString() + '</div>';
+                }
+
+                if (d.metadata.role) {
+                    tooltipContent += '<div style="font-size: 11px; color: #6b7280;">👤 Role: ' + d.metadata.role + '</div>';
+                }
+
+                // Show connection count
+                const connections = graphData.links.filter(link => {
+                    const sourceId = link.source.id || link.source;
+                    const targetId = link.target.id || link.target;
+                    return sourceId === d.id || targetId === d.id;
+                });
+                tooltipContent += '<div style="font-size: 11px; color: #6b7280;">🔗 ' + connections.length + ' connections</div>';
+
+                tooltipContent += '<div style="margin-top: 4px; font-size: 10px; color: #9ca3af; font-style: italic;">Click to view full message</div>';
+            } else {
+                // Standard tooltip for non-conversation nodes
+                if (d.description) tooltipContent += d.description + '<br/>';
+                if (d.filePath) tooltipContent += 'File: ' + d.filePath;
+            }
 
             tooltip.html(tooltipContent)
                 .style('left', (event.pageX + 10) + 'px')
                 .style('top', (event.pageY - 10) + 'px')
+                .style('max-width', '300px')
                 .classed('show', true);
 
             // Highlight connected nodes

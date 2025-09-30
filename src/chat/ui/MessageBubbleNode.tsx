@@ -143,19 +143,52 @@ export const MessageBubbleNode: React.FC<MessageBubbleNodeProps> = memo(({
         #{message.messageIndex}
       </text>
 
-      {/* Timestamp */}
+      {/* Enhanced Tooltip on Hover */}
       {isHovered && (
-        <text
-          x={dimensions.width / 2}
-          y={dimensions.height + 20}
-          fontSize="10"
-          fill={colors.secondaryText}
-          textAnchor="middle"
-          fontFamily="system-ui, -apple-system, sans-serif"
-          opacity="0.8"
-        >
-          {formatTimestamp(message.startTime)}
-        </text>
+        <g transform={`translate(${dimensions.width + 10}, -10)`}>
+          {/* Tooltip background */}
+          <rect
+            width="220"
+            height="auto"
+            rx="6"
+            fill="white"
+            stroke="#e5e7eb"
+            strokeWidth="1"
+            filter="url(#dropShadow)"
+          />
+
+          {/* Tooltip content */}
+          <text
+            fontSize="10"
+            fontFamily="system-ui, -apple-system, sans-serif"
+            fill="#1f2937"
+          >
+            {/* Message preview */}
+            <tspan x="8" dy="14" fontWeight="500">Message Preview</tspan>
+            <tspan x="8" dy="14" fill="#4b5563" fontSize="9">
+              {message.content.substring(0, 80)}
+              {message.content.length > 80 ? '...' : ''}
+            </tspan>
+
+            {/* Metadata */}
+            <tspan x="8" dy="18" fontSize="9" fill="#6b7280">
+              ⏱️ {formatTimestamp(message.startTime)}
+            </tspan>
+            <tspan x="8" dy="12" fontSize="9" fill="#6b7280">
+              🔗 {getConnectionCount(message)} connections
+            </tspan>
+            {message.metadata.branch && (
+              <tspan x="8" dy="12" fontSize="9" fill="#6b7280">
+                🌿 Branch: {message.metadata.branch}
+              </tspan>
+            )}
+
+            {/* Click hint */}
+            <tspan x="8" dy="16" fontSize="8" fill="#9ca3af" fontStyle="italic">
+              Click to view full message
+            </tspan>
+          </text>
+        </g>
       )}
 
       {/* Connection points for edges */}
@@ -389,4 +422,20 @@ function adjustColorBrightness(color: string, amount: number): string {
   const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
 
   return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+function getConnectionCount(message: MessageNode): number {
+  let count = 0;
+
+  // Count parent connection
+  if (message.parentMessageId) {
+    count++;
+  }
+
+  // Count child connections
+  if (message.childMessageIds && message.childMessageIds.length > 0) {
+    count += message.childMessageIds.length;
+  }
+
+  return count;
 }

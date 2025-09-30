@@ -509,4 +509,73 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
       return node?.type === 'document';
     });
   }
+
+  /**
+   * Get message content by ID
+   */
+  getMessageContent(messageId: string): string {
+    const node = this.store.getNode(messageId);
+    return node?.metadata?.content || node?.description || '';
+  }
+
+  /**
+   * Get message metadata by ID
+   */
+  getMessageMetadata(messageId: string): {
+    role: 'user' | 'assistant' | 'system';
+    timestamp: string;
+    branch: { id: string; name: string; isActive: boolean };
+    linkedCode: Array<{ nodeId: string; filePath: string; language: string }>;
+    relatedMessages: ConversationNode[];
+  } | null {
+    const node = this.store.getNode(messageId);
+    if (!node) return null;
+
+    return {
+      role: (node.metadata?.role as any) || 'user',
+      timestamp: node.metadata?.timestamp || new Date().toISOString(),
+      branch: this.getMessageBranch(messageId),
+      linkedCode: this.getLinkedCodeWithDetails(messageId),
+      relatedMessages: this.findRelatedMessages(messageId, 1)
+    };
+  }
+
+  /**
+   * Get linked code with full details
+   */
+  getLinkedCodeWithDetails(messageId: string): Array<{
+    nodeId: string;
+    filePath: string;
+    language: string;
+  }> {
+    const codeNodeIds = this.getLinkedCode(messageId);
+    return codeNodeIds.map(nodeId => {
+      const node = this.store.getNode(nodeId);
+      return {
+        nodeId,
+        filePath: node?.metadata?.filePath || nodeId,
+        language: node?.metadata?.language || 'typescript'
+      };
+    });
+  }
+
+  /**
+   * Get branch information for a message
+   */
+  private getMessageBranch(messageId: string): {
+    id: string;
+    name: string;
+    isActive: boolean;
+  } {
+    for (const [branchId, branch] of this.branches) {
+      if (branch.messages.includes(messageId)) {
+        return {
+          id: branchId,
+          name: branchId.split('-').pop() || 'main',
+          isActive: branch.active
+        };
+      }
+    }
+    return { id: 'main', name: 'main', isActive: true };
+  }
 }
