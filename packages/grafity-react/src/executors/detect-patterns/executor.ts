@@ -337,7 +337,7 @@ function generateHTMLReport(patterns: any[], projectName: string): string {
                         <div class="suggestions">
                             <h4>💡 Suggestions:</h4>
                             <ul>
-                                ${pattern.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                                ${pattern.suggestions.map((suggestion: string) => `<li>${suggestion}</li>`).join('')}
                             </ul>
                         </div>
                         ` : ''}
@@ -365,7 +365,7 @@ function generateHTMLReport(patterns: any[], projectName: string): string {
                         <div class="suggestions">
                             <h4>🚀 Recommendations:</h4>
                             <ul>
-                                ${pattern.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                                ${pattern.suggestions.map((suggestion: string) => `<li>${suggestion}</li>`).join('')}
                             </ul>
                         </div>
                         ` : ''}

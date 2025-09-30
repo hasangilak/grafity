@@ -241,10 +241,36 @@ function generateHTML(
     </div>
 
     <script>
+        function getNodeColor(type) {
+            switch (type) {
+                case 'state': return '#FF9800';
+                case 'api': return '#4CAF50';
+                case 'context': return '#E91E63';
+                default: return '#2196F3';
+            }
+        }
+
+        function getEdgeColor(type) {
+            switch (type) {
+                case 'passes_prop': return '#2196F3';
+                case 'provides_context': return '#E91E63';
+                case 'reads': return '#4CAF50';
+                case 'writes': return '#FF5722';
+                default: return '#999';
+            }
+        }
+
         const nodes = new vis.DataSet(${JSON.stringify(data.nodes.map(node => ({
           id: node.id,
           label: node.label,
-          color: getNodeColor(node.type),
+          color: (() => {
+            switch (node.type) {
+                case 'state': return '#FF9800';
+                case 'api': return '#4CAF50';
+                case 'context': return '#E91E63';
+                default: return '#2196F3';
+            }
+          })(),
           font: { color: '#333' },
         })))});
 
@@ -252,7 +278,15 @@ function generateHTML(
           from: edge.from,
           to: edge.to,
           label: edge.label || '',
-          color: getEdgeColor(edge.type),
+          color: (() => {
+            switch (edge.type) {
+                case 'passes_prop': return '#2196F3';
+                case 'provides_context': return '#E91E63';
+                case 'reads': return '#4CAF50';
+                case 'writes': return '#FF5722';
+                default: return '#999';
+            }
+          })(),
           arrows: 'to',
         })))});
 

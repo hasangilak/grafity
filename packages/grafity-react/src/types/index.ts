@@ -24,7 +24,7 @@ export interface PropInfo {
 
 export interface HookInfo {
   name: string;
-  type: 'useState' | 'useEffect' | 'useContext' | 'custom' | 'other';
+  type: 'useState' | 'useReducer' | 'useEffect' | 'useContext' | 'custom' | 'other';
   dependencies: string[];
   location: SourceLocation;
 }

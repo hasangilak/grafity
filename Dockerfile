@@ -17,11 +17,13 @@ RUN apk add --no-cache \
     git \
     curl
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and lock file
+COPY package.json package-lock.json ./
+COPY packages/grafity-react/package.json ./packages/grafity-react/
 
 # Install dependencies (including dev dependencies for building)
-RUN npm ci --only=production && \
+# Use --legacy-peer-deps to resolve peer dependency conflicts
+RUN npm ci --legacy-peer-deps && \
     npm cache clean --force
 
 # Copy source code
@@ -33,21 +35,28 @@ RUN chown -R grafity:nodejs /app
 # Switch to non-root user
 USER grafity
 
-# Build the application
-RUN npm run build
+# Build the Nx plugin
+RUN npx nx build grafity-react
 
-# Stage 2: Test runner (optional, can be used in CI)
+# Stage 2: Test runner for Nx plugin testing
 FROM builder AS tester
 
 # Switch back to root to install test dependencies
 USER root
 
-# Install test dependencies
+# Ensure all dependencies are available
 RUN npm ci
 
-# Run tests (this stage won't be included in final image)
-RUN npm run test:unit && \
-    npm run test:coverage
+# Switch back to non-root user
+USER grafity
+
+# Run Nx plugin tests
+RUN npx nx test grafity-react --ci --codeCoverage
+
+# Test plugin executors on sample React app
+RUN npx nx run grafity:demo:analyze && \
+    npx nx run grafity:demo:visualize && \
+    npx nx run grafity:demo:patterns
 
 # Stage 3: Production image
 FROM node:18-alpine AS production

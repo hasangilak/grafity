@@ -139,7 +139,7 @@ k8s/
 .github/
 
 # Package manager files
-package-lock.json
+# package-lock.json (needed for npm ci in Docker)
 yarn.lock
 
 # Environment and config files that shouldn't be in container
