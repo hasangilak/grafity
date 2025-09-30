@@ -165,3 +165,4 @@ client/.vite/
 .nx/workspace-data
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.mdphase2-analysis-results.json
+.playwright-mcp
