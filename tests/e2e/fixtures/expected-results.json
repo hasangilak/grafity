@@ -1,0 +1,286 @@
+{
+  "sampleReactApp": {
+    "name": "sample-react-app",
+    "description": "Sample React application for testing Grafity analysis capabilities",
+    "expectedComponentCount": 13,
+    "expectedFileCount": 12,
+    "components": [
+      {
+        "name": "App",
+        "file": "src/App.tsx",
+        "type": "functional",
+        "hooks": ["useState", "useEffect"],
+        "contexts": ["UserContext"]
+      },
+      {
+        "name": "Dashboard",
+        "file": "src/components/Dashboard.tsx",
+        "type": "functional",
+        "hooks": ["useState", "useEffect"],
+        "hasChildren": true
+      },
+      {
+        "name": "Header",
+        "file": "src/components/Header.tsx",
+        "type": "functional",
+        "props": ["user", "onLogout"],
+        "hasChildren": false
+      },
+      {
+        "name": "UserProfile",
+        "file": "src/components/UserProfile.tsx",
+        "type": "functional",
+        "hooks": ["useContext"],
+        "contexts": ["UserContext"]
+      },
+      {
+        "name": "UserAvatar",
+        "file": "src/components/UserAvatar.tsx",
+        "type": "functional",
+        "props": ["user", "size"]
+      },
+      {
+        "name": "TodoList",
+        "file": "src/components/TodoList.tsx",
+        "type": "functional",
+        "hooks": ["useState"],
+        "hasChildren": true
+      },
+      {
+        "name": "TodoItem",
+        "file": "src/components/TodoItem.tsx",
+        "type": "functional",
+        "props": ["todo", "onToggle", "onDelete"],
+        "hooks": ["useState"]
+      },
+      {
+        "name": "CreateTodoForm",
+        "file": "src/components/CreateTodoForm.tsx",
+        "type": "functional",
+        "hooks": ["useState"],
+        "hasEventHandlers": true
+      },
+      {
+        "name": "TodoSummary",
+        "file": "src/components/TodoSummary.tsx",
+        "type": "functional",
+        "props": ["todos"]
+      },
+      {
+        "name": "RecentActivity",
+        "file": "src/components/RecentActivity.tsx",
+        "type": "functional",
+        "hooks": ["useState", "useEffect"]
+      },
+      {
+        "name": "UserContext",
+        "file": "src/contexts/UserContext.tsx",
+        "type": "context-provider",
+        "provides": ["user", "setUser", "login", "logout"]
+      }
+    ],
+    "hooks": {
+      "useState": {
+        "count": 8,
+        "components": ["App", "Dashboard", "TodoList", "TodoItem", "CreateTodoForm", "RecentActivity"]
+      },
+      "useEffect": {
+        "count": 3,
+        "components": ["App", "Dashboard", "RecentActivity"]
+      },
+      "useContext": {
+        "count": 2,
+        "components": ["App", "UserProfile"]
+      }
+    },
+    "contexts": {
+      "UserContext": {
+        "provider": "src/contexts/UserContext.tsx",
+        "consumers": ["App", "UserProfile"]
+      }
+    },
+    "patterns": {
+      "expected": {
+        "goodPatterns": [
+          "Context API usage for state management",
+          "Custom hooks for reusable logic",
+          "Component composition",
+          "Prop-based communication"
+        ],
+        "antiPatterns": [],
+        "recommendations": []
+      }
+    },
+    "metrics": {
+      "totalComponents": 11,
+      "functionalComponents": 10,
+      "classComponents": 0,
+      "contextProviders": 1,
+      "averagePropsPerComponent": 2.5,
+      "averageHooksPerComponent": 1.8
+    },
+    "dataFlow": {
+      "stateFlows": [
+        {
+          "from": "UserContext",
+          "to": ["App", "UserProfile"],
+          "type": "context"
+        },
+        {
+          "from": "App",
+          "to": ["Header", "Dashboard"],
+          "type": "props"
+        },
+        {
+          "from": "TodoList",
+          "to": ["TodoItem"],
+          "type": "props"
+        }
+      ]
+    },
+    "files": {
+      "src/App.tsx": {
+        "type": "component",
+        "exports": ["App"]
+      },
+      "src/components/Dashboard.tsx": {
+        "type": "component",
+        "exports": ["Dashboard"]
+      },
+      "src/components/Header.tsx": {
+        "type": "component",
+        "exports": ["Header"]
+      },
+      "src/components/UserProfile.tsx": {
+        "type": "component",
+        "exports": ["UserProfile"]
+      },
+      "src/components/UserAvatar.tsx": {
+        "type": "component",
+        "exports": ["UserAvatar"]
+      },
+      "src/components/TodoList.tsx": {
+        "type": "component",
+        "exports": ["TodoList"]
+      },
+      "src/components/TodoItem.tsx": {
+        "type": "component",
+        "exports": ["TodoItem"]
+      },
+      "src/components/CreateTodoForm.tsx": {
+        "type": "component",
+        "exports": ["CreateTodoForm"]
+      },
+      "src/components/TodoSummary.tsx": {
+        "type": "component",
+        "exports": ["TodoSummary"]
+      },
+      "src/components/RecentActivity.tsx": {
+        "type": "component",
+        "exports": ["RecentActivity"]
+      },
+      "src/contexts/UserContext.tsx": {
+        "type": "context",
+        "exports": ["UserContext", "UserProvider", "useUser"]
+      },
+      "src/services/apiService.ts": {
+        "type": "service",
+        "exports": ["fetchTodos", "createTodo", "updateTodo", "deleteTodo"]
+      },
+      "src/types/index.ts": {
+        "type": "types",
+        "exports": ["User", "Todo", "Activity"]
+      }
+    }
+  },
+  "testScenarios": {
+    "newDeveloperJourney": {
+      "phases": [
+        {
+          "name": "Discovery",
+          "steps": [
+            "Read README.md",
+            "Check prerequisites",
+            "Understand architecture"
+          ],
+          "expectedDuration": "5-10 minutes"
+        },
+        {
+          "name": "Setup",
+          "steps": [
+            "Clone repository",
+            "npm install",
+            "Verify installation"
+          ],
+          "expectedDuration": "5-10 minutes"
+        },
+        {
+          "name": "Quick Start",
+          "steps": [
+            "Run demo:analyze",
+            "Run demo:visualize",
+            "Run demo:patterns"
+          ],
+          "expectedDuration": "10-15 minutes"
+        },
+        {
+          "name": "Exploration",
+          "steps": [
+            "Open visualization in browser",
+            "Interact with component tree",
+            "Review pattern report"
+          ],
+          "expectedDuration": "5-10 minutes"
+        },
+        {
+          "name": "Integration",
+          "steps": [
+            "Install @grafity/nx-react",
+            "Run nx analyze-react",
+            "Test with own project"
+          ],
+          "expectedDuration": "15-20 minutes"
+        }
+      ],
+      "totalExpectedDuration": "40-65 minutes"
+    }
+  },
+  "visualization": {
+    "expectedOutput": {
+      "format": "HTML",
+      "interactive": true,
+      "features": [
+        "Component tree view",
+        "Node click interaction",
+        "Details panel",
+        "Zoom/pan controls",
+        "Search functionality",
+        "Export options"
+      ],
+      "minNodeCount": 11,
+      "maxNodeCount": 13
+    },
+    "selectors": {
+      "componentNode": ".component-node, [data-testid='component-node'], svg circle, svg rect",
+      "detailsPanel": ".details-panel, [data-testid='details-panel'], .component-details",
+      "zoomControls": ".zoom-controls, [data-testid='zoom-controls'], button[aria-label*='zoom']",
+      "searchInput": "input[type='search'], input[placeholder*='search'], .search-input"
+    }
+  },
+  "performance": {
+    "benchmarks": {
+      "analysisTime": {
+        "max": 5000,
+        "unit": "milliseconds"
+      },
+      "visualizationGenerationTime": {
+        "max": 3000,
+        "unit": "milliseconds"
+      },
+      "patternDetectionTime": {
+        "max": 2000,
+        "unit": "milliseconds"
+      }
+    }
+  }
+}

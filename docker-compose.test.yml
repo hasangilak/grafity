@@ -70,6 +70,35 @@ services:
     profiles:
       - browser
 
+  # New Developer Journey E2E Tests
+  grafity-new-developer-journey:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: grafity-new-developer-journey
+    environment:
+      - NODE_ENV=test
+      - CI=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - test-results:/app/test-results
+      - viz-output:/app/dist/visualizations
+      - analysis-output:/app/dist/analysis
+    networks:
+      - grafity-test-network
+    command:
+      - sh
+      - -c
+      - |
+        echo "🚀 Starting New Developer Journey Tests..." &&
+        npx playwright install chromium &&
+        npx playwright test tests/e2e/new-developer-journey.spec.ts --reporter=html &&
+        echo "✅ New Developer Journey Tests Complete!"
+    profiles:
+      - e2e
+
 volumes:
   test-results:
     driver: local

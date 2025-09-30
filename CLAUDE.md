@@ -124,6 +124,34 @@ The **@grafity/nx-react** plugin enhances Nx's project graph with React intellig
 
 ## Testing Strategy
 
+### E2E Testing with Playwright (NEW ✅)
+- **Comprehensive test suite**: 22 tests covering new developer journey
+- **Test file**: `tests/e2e/new-developer-journey.spec.ts`
+- **Pass rate**: 91% (20/22 tests)
+- **Phases tested**: Documentation, Installation, Demo Execution, Visualization, Pattern Detection, Nx Integration
+
+```bash
+# Run E2E tests
+npx playwright test tests/e2e/new-developer-journey.spec.ts
+
+# Run with HTML reporter
+npx playwright test tests/e2e/new-developer-journey.spec.ts --reporter=html
+
+# Run in Docker
+docker compose -f docker-compose.test.yml --profile e2e up
+```
+
+### Demo Scripts (Complete Set)
+```bash
+# All demo scripts now working!
+npm run demo:analyze      # Analyze 13 React components
+npm run demo:visualize    # Generate interactive HTML visualization
+npm run demo:patterns     # Detect patterns and anti-patterns
+
+# Open generated visualization
+open dist/visualizations/component-tree.html
+```
+
 ### Sample React App (`examples/sample-react-app/`)
 - **13 TypeScript React files** with various patterns
 - **Context usage**, custom hooks, API services, component composition
@@ -137,6 +165,11 @@ npx nx analyze-react sample-react-app
 npx nx visualize-components sample-react-app --outputPath=dist/test-viz
 npx nx detect-patterns sample-react-app --outputPath=dist/test-patterns.md
 ```
+
+### Test Documentation
+- **Test Report**: See `NEW-DEVELOPER-JOURNEY-REPORT.md` for comprehensive results
+- **UX Roadmap**: See `UX-IMPROVEMENTS-ROADMAP.md` for actionable improvements
+- **Test Summary**: See `PLAYWRIGHT-MCP-TEST-SUMMARY.md` for infrastructure details
 
 ## Migration from Standalone Grafity
 
