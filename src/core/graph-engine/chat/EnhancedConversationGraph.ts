@@ -2,6 +2,8 @@ import { ConversationGraphBuilder, ConversationData, ConversationMessage } from 
 import { ConversationNode, createConversationNode } from '../types/NodeTypes';
 import { GraphStore } from '../GraphStore';
 import { createBidirectionalEdge, EdgeRelationType } from '../types/EdgeTypes';
+import { BranchStyleManager } from './BranchStyleManager';
+import { BranchOperations } from './BranchOperations';
 
 export interface ChatMessage {
   id?: string;
@@ -35,9 +37,13 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
   private branches = new Map<string, ConversationBranch>();
   private activeBranchId: string | null = null;
   private updateCallbacks: Array<(update: any) => void> = [];
+  public branchStyleManager: BranchStyleManager;
+  public branchOperations: BranchOperations;
 
   constructor(store: GraphStore) {
     super(store);
+    this.branchStyleManager = new BranchStyleManager();
+    this.branchOperations = new BranchOperations(store);
   }
 
   /**
@@ -89,6 +95,14 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
     this.branches.set(defaultBranch.id, defaultBranch);
     this.activeBranchId = defaultBranch.id;
 
+    // Register branch style
+    this.branchStyleManager.createBranchStyle(
+      defaultBranch.id,
+      'Main Branch',
+      conversationId,
+      true
+    );
+
     return conversation;
   }
 
@@ -108,6 +122,8 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
         role: message.role,
         timestamp: message.timestamp || new Date().toISOString(),
         contentLength: message.content.length,
+        branchId: this.activeBranchId || undefined,
+        content: message.content,
         ...message.metadata
       },
       participant: message.role,
@@ -183,9 +199,12 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
   /**
    * Create a new branch from a message
    */
-  createBranch(fromMessageId: string, message: ChatMessage): string {
+  createBranch(fromMessageId: string, message: ChatMessage, branchName?: string): string {
     const branchId = this.generateNodeId(`branch-${fromMessageId}-${Date.now()}`);
     const conversationId = this.getConversationId(fromMessageId);
+
+    // Auto-generate branch name if not provided
+    const generatedName = branchName || this.generateBranchName(message.content);
 
     // Create branch metadata
     const branch: ConversationBranch = {
@@ -197,6 +216,14 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
     };
 
     this.branches.set(branchId, branch);
+
+    // Register branch style
+    this.branchStyleManager.createBranchStyle(
+      branchId,
+      generatedName,
+      fromMessageId,
+      false
+    );
 
     // Temporarily switch to new branch
     const previousBranch = this.activeBranchId;
@@ -249,6 +276,9 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
       this.activeBranchId = branchId;
       const newBranch = this.branches.get(branchId);
       if (newBranch) newBranch.active = true;
+
+      // Update branch styles
+      this.branchStyleManager.setActiveBranch(branchId);
 
       this.notifyUpdate({
         type: 'branch_switched',
@@ -577,5 +607,95 @@ export class EnhancedConversationGraph extends ConversationGraphBuilder {
       }
     }
     return { id: 'main', name: 'main', isActive: true };
+  }
+
+  /**
+   * Generate a branch name from message content
+   */
+  private generateBranchName(messageContent: string): string {
+    // Extract first few meaningful words
+    const words = messageContent
+      .replace(/[^\w\s]/g, '')
+      .split(/\s+/)
+      .filter(word => word.length > 2)
+      .slice(0, 3);
+
+    if (words.length === 0) {
+      return `Branch ${Date.now()}`;
+    }
+
+    // Capitalize first letter of each word
+    const name = words
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    return name.length > 30 ? name.substring(0, 30) + '...' : name;
+  }
+
+  /**
+   * Rename a branch
+   */
+  renameBranch(branchId: string, newName: string): void {
+    const branch = this.branches.get(branchId);
+    if (!branch) {
+      throw new Error(`Branch not found: ${branchId}`);
+    }
+
+    const oldStyle = this.branchStyleManager.getBranchStyle(branchId);
+    if (oldStyle) {
+      const oldName = oldStyle.name;
+      this.branchStyleManager.renameBranch(branchId, newName);
+      this.branchOperations.renameBranch(branchId, newName, oldName);
+
+      this.notifyUpdate({
+        type: 'branch_renamed',
+        branchId,
+        oldName,
+        newName
+      });
+    }
+  }
+
+  /**
+   * Archive a branch
+   */
+  archiveBranch(branchId: string): void {
+    if (branchId === this.activeBranchId) {
+      throw new Error('Cannot archive the active branch');
+    }
+
+    this.branchOperations.archiveBranch(branchId);
+
+    this.notifyUpdate({
+      type: 'branch_archived',
+      branchId
+    });
+  }
+
+  /**
+   * Get branch diff for comparison
+   */
+  getBranchDiff(branch1Id: string, branch2Id: string): {
+    branch1: ConversationBranch | undefined;
+    branch2: ConversationBranch | undefined;
+    divergencePoint: string | null;
+  } {
+    const branch1 = this.branches.get(branch1Id);
+    const branch2 = this.branches.get(branch2Id);
+
+    if (!branch1 || !branch2) {
+      return { branch1, branch2, divergencePoint: null };
+    }
+
+    // Find common ancestor (divergence point)
+    const commonMessages = branch1.messages.filter(id =>
+      branch2.messages.includes(id)
+    );
+
+    const divergencePoint = commonMessages.length > 0
+      ? commonMessages[commonMessages.length - 1]
+      : null;
+
+    return { branch1, branch2, divergencePoint };
   }
 }

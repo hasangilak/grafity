@@ -1,6 +1,7 @@
 import { GraphStore } from '../GraphStore';
 import { AnyGraphNode } from '../types/NodeTypes';
 import { GraphEdge } from '../types/EdgeTypes';
+import { BranchStyleManager, BranchStyle } from '../chat/BranchStyleManager';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -9,9 +10,11 @@ import * as path from 'path';
  */
 export class HtmlGraphGenerator {
   private store: GraphStore;
+  private branchStyleManager?: BranchStyleManager;
 
-  constructor(store: GraphStore) {
+  constructor(store: GraphStore, branchStyleManager?: BranchStyleManager) {
     this.store = store;
+    this.branchStyleManager = branchStyleManager;
   }
 
   /**
@@ -82,25 +85,40 @@ export class HtmlGraphGenerator {
 
     <div id="legend">
         <h3>Legend</h3>
-        <div class="legend-item">
-            <span class="legend-color" style="background: #4CAF50;"></span>
-            <span>Code (Component/Function)</span>
+        ${graphData.branchLegend && graphData.branchLegend.length > 0 ? `
+        <div class="legend-section">
+            <h4 style="font-size: 12px; color: #666; margin: 10px 0 5px 0;">Branches</h4>
+            ${graphData.branchLegend.map(branch => `
+                <div class="legend-item">
+                    <span class="legend-color" style="background: ${branch.color};${branch.isActive ? ' border: 2px solid #333;' : ''}"></span>
+                    <span>${branch.icon} ${branch.name}${branch.isActive ? ' (active)' : ''}</span>
+                </div>
+            `).join('')}
         </div>
-        <div class="legend-item">
-            <span class="legend-color" style="background: #2196F3;"></span>
-            <span>Business (Feature/Story)</span>
-        </div>
-        <div class="legend-item">
-            <span class="legend-color" style="background: #FF9800;"></span>
-            <span>Document</span>
-        </div>
-        <div class="legend-item">
-            <span class="legend-color" style="background: #9C27B0;"></span>
-            <span>Conversation</span>
-        </div>
-        <div class="legend-item">
-            <span class="legend-color" style="background: #666;"></span>
-            <span>File/Other</span>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 10px 0;" />
+        ` : ''}
+        <div class="legend-section">
+            <h4 style="font-size: 12px; color: #666; margin: 10px 0 5px 0;">Node Types</h4>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #4CAF50;"></span>
+                <span>Code (Component/Function)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #2196F3;"></span>
+                <span>Business (Feature/Story)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #FF9800;"></span>
+                <span>Document</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #9C27B0;"></span>
+                <span>Conversation</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #666;"></span>
+                <span>File/Other</span>
+            </div>
         </div>
     </div>
 
@@ -116,24 +134,46 @@ export class HtmlGraphGenerator {
    * Prepare graph data for D3.js
    */
   private prepareGraphData() {
-    const nodes = this.store.getAllNodes().map(node => ({
-      id: node.id,
-      label: node.label,
-      type: node.type,
-      description: node.description || '',
-      codeType: 'codeType' in node ? node.codeType : undefined,
-      filePath: 'filePath' in node ? node.filePath : undefined
-    }));
+    const nodes = this.store.getAllNodes().map(node => {
+      const baseNode: any = {
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        description: node.description || '',
+        codeType: 'codeType' in node ? node.codeType : undefined,
+        filePath: 'filePath' in node ? node.filePath : undefined,
+        metadata: node.metadata
+      };
+
+      // Add branch styling for conversation nodes
+      if (node.type === 'conversation' && node.metadata?.branchId && this.branchStyleManager) {
+        const branchStyle = this.branchStyleManager.getBranchStyle(node.metadata.branchId);
+        if (branchStyle) {
+          baseNode.branchId = node.metadata.branchId;
+          baseNode.branchColor = branchStyle.color;
+          baseNode.branchName = branchStyle.name;
+          baseNode.branchIcon = branchStyle.icon;
+          baseNode.branchPattern = branchStyle.pattern;
+          baseNode.isActiveBranch = branchStyle.isActive;
+        }
+      }
+
+      return baseNode;
+    });
 
     const links = this.store.getAllEdges().map(edge => ({
       source: edge.source,
       target: edge.target,
       type: edge.type,
       bidirectional: edge.bidirectional,
-      weight: edge.weight || 1
+      weight: edge.weight || 1,
+      metadata: edge.metadata
     }));
 
-    return { nodes, links };
+    // Add branch styles for legend
+    const branchLegend = this.branchStyleManager?.getLegendData() || [];
+
+    return { nodes, links, branchLegend };
   }
 
   /**
@@ -419,11 +459,24 @@ export class HtmlGraphGenerator {
                 return 10;
             })
             .attr('fill', d => {
+                // Use branch color for conversation nodes
+                if (d.type === 'conversation' && d.branchColor) {
+                    return d.branchColor;
+                }
+                // Use code subtype colors
                 if (d.type === 'code' && d.codeType) {
                     return codeColorScale[d.codeType] || colorScale[d.type];
                 }
                 return colorScale[d.type] || '#666';
             })
+            .attr('stroke', d => {
+                // Active branch gets thicker stroke
+                if (d.isActiveBranch) {
+                    return d.branchColor || '#333';
+                }
+                return '#fff';
+            })
+            .attr('stroke-width', d => d.isActiveBranch ? 3 : 2)
             .call(drag(simulation));
 
         // Create labels
@@ -451,6 +504,14 @@ export class HtmlGraphGenerator {
 
             // Enhanced tooltip for conversation nodes (messages)
             if (d.type === 'conversation' && d.metadata) {
+                // Show branch info
+                if (d.branchName) {
+                    tooltipContent += '<div style="margin-top: 4px; font-size: 11px; font-weight: 600; color: ' + d.branchColor + ';">';
+                    tooltipContent += d.branchIcon + ' Branch: ' + d.branchName;
+                    if (d.isActiveBranch) tooltipContent += ' (active)';
+                    tooltipContent += '</div>';
+                }
+
                 // Show message content preview
                 const content = d.metadata.content || d.description || '';
                 if (content) {

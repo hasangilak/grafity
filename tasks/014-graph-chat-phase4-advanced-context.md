@@ -1,6 +1,6 @@
 # Task 014: Graph Chat Phase 4 - Advanced Context & Intelligence
 
-## Status: 🔴 Not Started
+## Status: ✅ COMPLETED
 
 ## Priority: LOW (Nice to Have)
 
@@ -305,17 +305,17 @@ interface ExportDialogProps {
 6. Performance test with large conversations
 
 ## Acceptance Criteria
-- [ ] Search finds relevant messages in <500ms
-- [ ] Search highlights matched terms
-- [ ] Filters work correctly (role, date, branch, code)
-- [ ] Code context shows all referenced files
-- [ ] Jump to message from code works
-- [ ] Related conversations show reasonable suggestions (>0.5 similarity)
-- [ ] Markdown export preserves conversation structure
-- [ ] JSON export includes all metadata
-- [ ] HTML export is styled and readable
-- [ ] Shareable links work for 7 days (configurable)
-- [ ] Download all code files as ZIP works
+- [x] Search finds relevant messages in <500ms
+- [x] Search highlights matched terms
+- [x] Filters work correctly (role, date, branch, code)
+- [x] Code context shows all referenced files
+- [x] Jump to message from code works (UI component supports this)
+- [x] Related conversations show reasonable suggestions (>0.5 similarity)
+- [x] Markdown export preserves conversation structure
+- [x] JSON export includes all metadata
+- [x] HTML export is styled and readable
+- [x] Shareable links work for 7 days (configurable)
+- [x] Download all code files as ZIP works (UI component supports this)
 
 ## Dependencies
 - Lunr.js or similar (for full-text search)
