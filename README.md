@@ -2,6 +2,51 @@
 
 **Grafity has evolved from a standalone tool into a comprehensive graph-based analysis platform with both Nx plugin capabilities and a powerful core graph engine with advanced visual interface.**
 
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js** 18+ and npm
+- **Docker** and Docker Compose (for Neo4j database)
+- **Git** (for cloning the repository)
+
+### Initial Setup
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd grafity
+
+# 2. Install dependencies
+npm install
+
+# 3. Start Neo4j database (required for graph engine)
+docker-compose up -d
+
+# 4. Verify Docker containers are running
+docker ps | grep neo4j
+
+# 5. Run your first analysis
+npm run demo:analyze      # Analyze 13 React components
+npm run demo:visualize    # Generate interactive visualization
+npm run demo:patterns     # Detect patterns and anti-patterns
+
+# 6. Test graph chat interface
+npm run demo:graph-chat   # Interactive graph-based conversation
+
+# 7. Open the visualization
+open dist/visualizations/component-tree.html
+```
+
+### Integration with Your Nx Workspace
+```bash
+# Install as a plugin in your existing Nx workspace
+npm install -D @grafity/nx-react
+
+# Use the executors
+nx analyze-react <your-project-name>
+nx visualize-components <your-project-name>
+nx detect-patterns <your-project-name>
+```
+
 ## 🚀 Current Development Status
 
 ### ✅ Phase 3: Graph Engine Core (95% Complete)
@@ -62,16 +107,50 @@ grafity/
 
 ## 🛠️ Installation & Usage
 
-### Core Graph Engine
+### Docker Container Management
 ```bash
-# Neo4j setup for enterprise persistence
+# Start all services (Neo4j database)
 docker-compose up -d
 
+# Check container status
+docker ps
+
+# View Neo4j logs
+docker-compose logs -f neo4j
+
+# Stop all services
+docker-compose down
+
+# Stop and remove all data (clean restart)
+docker-compose down -v
+
+# Access Neo4j Browser (for manual inspection)
+# Open: http://localhost:7474
+# Credentials: neo4j/password (from docker-compose.yml)
+```
+
+### Core Graph Engine
+```bash
 # Run graph engine tests
 npm run test:graph-engine
 
 # Test Neo4j integration
 npm run test:neo4j
+
+# Test with large dataset (100+ nodes)
+npm run demo:large-graph
+```
+
+### Graph Chat Interface Testing
+```bash
+# Start graph chat demo (interactive CLI)
+npm run demo:graph-chat
+
+# The graph chat demonstrates:
+# - Conversation nodes as graph structure
+# - Bidirectional connections between messages
+# - Branching conversation paths
+# - Integration with code and document nodes
 ```
 
 ### Visual Interface
@@ -84,6 +163,9 @@ npm run demo:visualize
 
 # Generate interactive HTML graph
 npm run demo:graph
+
+# Open visualization in browser
+open dist/visualizations/component-tree.html
 ```
 
 ### Nx Plugin (React Analysis)

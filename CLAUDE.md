@@ -51,6 +51,188 @@ npm run demo:patterns   # Detect React patterns
 npm run demo:graph-chat # Graph-based conversation with branching
 ```
 
+## 🧪 QA Testing & Local Verification
+
+### Prerequisites for Testing
+Before running any tests, ensure:
+1. **Docker is running** and accessible
+2. **Node.js 18+** is installed
+3. **npm dependencies** are installed (`npm install`)
+
+### Complete QA Test Workflow
+
+#### Step 1: Environment Setup
+```bash
+# Verify Node.js version
+node --version  # Should be 18+
+
+# Install dependencies
+npm install
+
+# Verify Docker is running
+docker ps
+
+# Start Neo4j database (required for graph engine)
+docker-compose up -d
+
+# Verify Neo4j is running
+docker ps | grep neo4j
+# Should show neo4j container running on ports 7474 and 7687
+
+# Check Neo4j logs for errors
+docker-compose logs neo4j | tail -20
+```
+
+#### Step 2: Core Functionality Tests
+```bash
+# Test graph engine core
+npm run test:graph-engine
+# Expected: All graph operations (CRUD, traversal) pass
+
+# Test Neo4j integration
+npm run test:neo4j
+# Expected: Database operations and persistence work correctly
+
+# Test with large dataset
+npm run demo:large-graph
+# Expected: 100+ nodes handled efficiently
+```
+
+#### Step 3: Graph Chat Interface Testing
+```bash
+# Start graph chat demo
+npm run demo:graph-chat
+
+# The demo should demonstrate:
+# ✅ Conversation nodes in graph structure
+# ✅ Bidirectional message connections
+# ✅ Branching conversation paths
+# ✅ Links between chat, code, and document nodes
+
+# Verify in Neo4j Browser:
+# 1. Open http://localhost:7474
+# 2. Login: neo4j / password
+# 3. Run query: MATCH (n:ConversationNode) RETURN n LIMIT 25
+# 4. Should see conversation nodes with relationships
+```
+
+#### Step 4: React Analysis Demo
+```bash
+# Analyze sample React app (13 components)
+npm run demo:analyze
+# Expected: JSON output with component analysis
+
+# Generate visualization
+npm run demo:visualize
+# Expected: HTML file created in dist/visualizations/
+
+# Open visualization
+open dist/visualizations/component-tree.html
+# Expected: Interactive graph in browser
+
+# Detect patterns
+npm run demo:patterns
+# Expected: Markdown report with patterns/anti-patterns
+```
+
+#### Step 5: E2E Testing with Playwright
+```bash
+# Run comprehensive E2E test suite
+npx playwright test tests/e2e/new-developer-journey.spec.ts
+
+# Run with visual HTML reporter
+npx playwright test tests/e2e/new-developer-journey.spec.ts --reporter=html
+
+# View test results
+npx playwright show-report
+
+# Run in Docker (isolated environment)
+docker compose -f docker-compose.test.yml --profile e2e up
+```
+
+#### Step 6: Nx Integration Testing
+```bash
+# Test Nx executors on sample app
+npx nx analyze-react sample-react-app
+npx nx visualize-components sample-react-app --outputPath=dist/test-viz
+npx nx detect-patterns sample-react-app --outputPath=dist/test-patterns.md
+
+# Verify outputs exist
+ls -la dist/test-viz/
+ls -la dist/test-patterns.md
+```
+
+### Docker Container Management for QA
+
+```bash
+# Check all running containers
+docker ps
+
+# View Neo4j logs (for debugging)
+docker-compose logs -f neo4j
+
+# Restart Neo4j (if issues occur)
+docker-compose restart neo4j
+
+# Stop all services
+docker-compose down
+
+# Clean restart (removes all data)
+docker-compose down -v
+docker-compose up -d
+
+# Access Neo4j Browser for manual verification
+# URL: http://localhost:7474
+# Username: neo4j
+# Password: password
+```
+
+### Verification Checklist for QA Agent
+
+**Before running tests:**
+- [ ] Docker daemon is running
+- [ ] Neo4j container is healthy (`docker ps` shows "healthy" status)
+- [ ] Node modules are installed (`node_modules/` exists)
+- [ ] Port 7474 and 7687 are available (not in use by other processes)
+
+**During testing:**
+- [ ] All demo scripts execute without errors
+- [ ] Visualizations are generated correctly
+- [ ] Neo4j contains expected nodes and relationships
+- [ ] Playwright tests pass (>90% success rate)
+- [ ] No error logs in Docker containers
+
+**After testing:**
+- [ ] Verify output files exist in expected locations
+- [ ] Check Neo4j database has test data (via Browser UI)
+- [ ] Review generated visualizations for correctness
+- [ ] Confirm pattern detection reports are accurate
+
+### Troubleshooting Common Issues
+
+```bash
+# If Neo4j connection fails
+docker-compose restart neo4j
+docker-compose logs neo4j
+
+# If port conflicts occur
+lsof -i :7474  # Find process using port
+lsof -i :7687
+# Kill conflicting process or change ports in docker-compose.yml
+
+# If tests fail due to missing dependencies
+npm ci  # Clean install
+npm run build
+
+# If visualization doesn't open
+ls -la dist/visualizations/
+# Manually open file: dist/visualizations/component-tree.html
+
+# Check Docker disk space
+docker system df
+docker system prune  # Clean up if needed
+```
+
 ### Nx Executors (for React projects)
 ```bash
 nx analyze-react my-react-app                    # Analyze React components
